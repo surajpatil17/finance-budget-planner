@@ -2,13 +2,261 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Expense Tracker</title>
+  <style>
+    :root{
+      --bg:#f4f7fb; --card:#fff; --accent:#2b8aef; --danger:#e74c3c; --muted:#6b7280;
+      --success:#2ecc71; --max-width:900px;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#eef6ff 0%,var(--bg) 100%);color:#0f172a}
+    .wrap{max-width:var(--max-width);margin:32px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+    h1{margin:0;font-size:1.4rem}
+    .layout{display:grid;grid-template-columns:1fr 360px;gap:20px;margin-top:18px}
+    .card{background:var(--card);padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(12,20,40,0.06)}
+    .summary{display:flex;gap:12px;flex-wrap:wrap}
+    .stat{flex:1;min-width:120px;padding:12px;border-radius:8px;background:linear-gradient(180deg,#fff,#fbfdff);text-align:center}
+    .stat h3{margin:0;font-size:.9rem;color:var(--muted)} .stat p{margin:6px 0 0;font-weight:700;font-size:1.1rem}
+    form{display:flex;flex-direction:column;gap:8px}
+    input[type="text"], input[type="number"], select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef9;background:#fbfeff}
+    .row{display:flex;gap:8px}
+    .row .col{flex:1}
+    button{cursor:pointer;border:0;padding:10px 12px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600}
+    button.secondary{background:#f1f5f9;color:#0f172a;border:1px solid #e6eef9}
+    ul.txn-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
+    li.txn{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:8px;border:1px solid #f1f5f9;background:#fff}
+    .txn .left{display:flex;flex-direction:column;gap:3px}
+    .txn .amount{font-weight:700}
+    .amount.negative{color:var(--danger)} .amount.positive{color:var(--success)}
+    .controls{display:flex;gap:8px;align-items:center}
+    .muted{color:var(--muted);font-size:.9rem}
+    footer{margin-top:14px;text-align:center;color:var(--muted);font-size:.88rem}
+    @media (max-width:880px){
+      .layout{grid-template-columns:1fr; padding-bottom:40px}
+      header{flex-direction:column;align-items:flex-start;gap:8px}
+    }
+  </style>
 </head>
 <body>
-  <h1>Expense Tracker</h1>
-  <p>Short description: A small project to track expenses and plan budgets.</p>
-  <p>Name: Siddu Mathapati</p>
-  <p>Roll number: ROLL-12345</p>
-  <p><strong>This is my finance project</strong></p>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Expense Tracker</h1>
+        <p class="muted">Track incomes, expenses and budget simply.</p>
+      </div>
+      <div class="muted">Name: suraj patil — <strong>Finance Project</strong></div>
+    </header>
+
+    <div class="layout">
+      <!-- Main column: transactions and form -->
+      <main class="card" aria-live="polite">
+        <section class="summary" style="margin-bottom:12px">
+          <div class="stat">
+            <h3>Balance</h3>
+            <p id="balance">$0.00</p>
+          </div>
+          <div class="stat">
+            <h3>Income</h3>
+            <p id="income" class="positive">$0.00</p>
+          </div>
+          <div class="stat">
+            <h3>Expense</h3>
+            <p id="expense" class="negative">$0.00</p>
+          </div>
+        </section>
+
+        <section style="margin-bottom:12px">
+          <form id="txnForm">
+            <div class="row">
+              <input type="text" id="desc" placeholder="Description" required />
+            </div>
+            <div class="row">
+              <div class="col">
+                <input type="number" step="0.01" id="amount" placeholder="Amount (positive number)" required />
+              </div>
+              <div style="width:140px">
+                <select id="type" aria-label="Type">
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button type="submit">Add</button>
+              <button type="button" class="secondary" id="clearAll">Clear All</button>
+            </div>
+          </form>
+        </section>
+
+        <section>
+          <h3 style="margin:0 0 8px 0">Transactions</h3>
+          <ul id="transactions" class="txn-list" aria-live="polite"></ul>
+        </section>
+      </main>
+
+      <!-- Sidebar: quick stats / tips -->
+      <aside class="card">
+        <h3 style="margin-top:0">Quick Tips</h3>
+        <p class="muted">Use this simple tracker to log incomes and expenses. Data is stored in your browser.</p>
+        <hr />
+        <div style="margin-top:8px">
+          <p class="muted" style="margin-bottom:6px">Export / Import</p>
+          <div style="display:flex;gap:8px">
+            <button id="exportBtn" class="secondary">Export JSON</button>
+            <button id="importBtn" class="secondary">Import</button>
+          </div>
+          <input type="file" id="importFile" accept="application/json" style="display:none;margin-top:8px" />
+        </div>
+      </aside>
+    </div>
+
+    <footer class="muted">Data saved locally in browser localStorage. Responsive layout for mobile and desktop.</footer>
+  </div>
+
+  <script>
+    // Simple finance tracker with localStorage persistence.
+    const STORAGE_KEY = 'finance-tracker-data:v1';
+    const form = document.getElementById('txnForm');
+    const descInput = document.getElementById('desc');
+    const amountInput = document.getElementById('amount');
+    const typeInput = document.getElementById('type');
+    const transactionsEl = document.getElementById('transactions');
+    const balanceEl = document.getElementById('balance');
+    const incomeEl = document.getElementById('income');
+    const expenseEl = document.getElementById('expense');
+    const clearAllBtn = document.getElementById('clearAll');
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const importFile = document.getElementById('importFile');
+
+    let transactions = [];
+
+    function saveTransactions(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    }
+
+    function loadTransactions(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        try{ transactions = JSON.parse(raw) || []; }
+        catch(e){ transactions = []; }
+      } else transactions = [];
+      renderTransactions();
+    }
+
+    function formatCurrency(v){
+      const n = Number(v) || 0;
+      return n.toLocaleString(undefined, {style:'currency',currency:'USD'});
+    }
+
+    function updateSummary(){
+      const incomes = transactions.filter(t=>t.type==='income').reduce((s,t)=>s + Math.abs(Number(t.amount)),0);
+      const expenses = transactions.filter(t=>t.type==='expense').reduce((s,t)=>s + Math.abs(Number(t.amount)),0);
+      const balance = incomes - expenses;
+      balanceEl.textContent = formatCurrency(balance);
+      incomeEl.textContent = formatCurrency(incomes);
+      expenseEl.textContent = formatCurrency(expenses);
+    }
+
+    function renderTransactions(){
+      transactionsEl.innerHTML = '';
+      if(transactions.length === 0){
+        const li = document.createElement('li');
+        li.className = 'txn';
+        li.innerHTML = '<div class="left"><span class="muted">No transactions yet</span></div>';
+        transactionsEl.appendChild(li);
+        updateSummary();
+        return;
+      }
+      transactions.slice().reverse().forEach(tx=>{
+        const li = document.createElement('li');
+        li.className = 'txn';
+        const amtClass = tx.type === 'income' ? 'positive' : 'negative';
+        li.innerHTML = `
+          <div class="left">
+            <div><strong>${escapeHtml(tx.description)}</strong></div>
+            <div class="muted">${new Date(tx.date).toLocaleString()}</div>
+          </div>
+          <div class="controls">
+            <div class="amount ${amtClass}">${formatCurrency(tx.amount)}</div>
+            <button class="secondary" data-id="${tx.id}">Delete</button>
+          </div>
+        `;
+        const del = li.querySelector('button');
+        del.addEventListener('click', ()=>removeTransaction(tx.id));
+        transactionsEl.appendChild(li);
+      });
+      updateSummary();
+    }
+
+    function addTransaction(e){
+      e.preventDefault();
+      const desc = descInput.value.trim();
+      const amt = parseFloat(amountInput.value);
+      const type = typeInput.value;
+      if(!desc || !isFinite(amt) || amt === 0){
+        alert('Please enter a valid description and a non-zero amount.');
+        return;
+      }
+      const txn = { id: Date.now().toString(), description: desc, amount: Math.abs(amt), type, date: new Date().toISOString() };
+      transactions.push(txn);
+      saveTransactions();
+      renderTransactions();
+      form.reset();
+      descInput.focus();
+    }
+
+    function removeTransaction(id){
+      transactions = transactions.filter(t=>t.id !== id);
+      saveTransactions();
+      renderTransactions();
+    }
+
+    clearAllBtn.addEventListener('click', ()=>{
+      if(!confirm('Clear all transactions? This cannot be undone.')) return;
+      transactions = [];
+      saveTransactions();
+      renderTransactions();
+    });
+
+    form.addEventListener('submit', addTransaction);
+
+    exportBtn.addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(transactions, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'finance-data.json'; document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+    });
+
+    importBtn.addEventListener('click', ()=>importFile.click());
+    importFile.addEventListener('change', (ev)=>{
+      const f = ev.target.files && ev.target.files[0];
+      if(!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          const data = JSON.parse(reader.result);
+          if(Array.isArray(data)){
+            transactions = data.map(d => ({ id: d.id || Date.now().toString(), description: d.description || '', amount: Number(d.amount) || 0, type: d.type || 'expense', date: d.date || new Date().toISOString() }));
+            saveTransactions(); renderTransactions();
+            alert('Import successful');
+          } else alert('Invalid file format');
+        }catch(err){ alert('Could not parse JSON'); }
+      };
+      reader.readAsText(f);
+      importFile.value = '';
+    });
+
+    // small helper to avoid HTML injection in transaction descriptions
+    function escapeHtml(s = ''){
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // initialize
+    loadTransactions();
+  </script>
 </body>
 </html>
